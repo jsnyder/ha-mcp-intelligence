@@ -1,0 +1,17 @@
+# Only include compiled JavaScript and essentials in npm package
+src/
+tsconfig.json
+.env
+.env.local
+*.ts
+!*.d.ts
+
+# Development files
+DEVELOPMENT.md
+STATUS.md
+IMPLEMENTATION_COMPLETE.md
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store

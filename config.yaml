@@ -1,0 +1,26 @@
+name: Home Assistant MCP Intelligence Server
+version: "0.1.0"
+slug: ha-mcp-intelligence
+description: Server-side MCP intelligence for Home Assistant development
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+init: false
+startup: application
+boot: auto
+ports:
+  3123/tcp: 3123
+ports_description:
+  3123/tcp: MCP Intelligence Server (HTTP/SSE)
+options:
+  log_level: info
+  cache_ttl_seconds: 60
+  auth_required: true
+schema:
+  log_level: list(debug|info|warning|error)?
+  cache_ttl_seconds: int(30,300)?
+  auth_required: bool?
+image: ghcr.io/jsnyder/ha-mcp-intelligence-{arch}
