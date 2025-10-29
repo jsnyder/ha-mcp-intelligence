@@ -31,5 +31,5 @@ jobs:
         with:
           args: |
             --all \
-            --target . \
+            --target ./ha-mcp-intelligence \
             --docker-hub ghcr.io/${{ github.repository_owner }}
