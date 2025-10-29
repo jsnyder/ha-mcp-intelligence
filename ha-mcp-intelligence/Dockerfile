@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:16.3.2
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
 FROM $BUILD_FROM
 
 # Install Node.js 22.x
