@@ -15,6 +15,7 @@ export interface AgentToolsConfig {
 export class AgentTools {
   private sessionManager: SessionManager;
   private continuationRunner: ContinuationRunner;
+  private executionPromises = new Map<string, Promise<void>>();
 
   constructor(config: AgentToolsConfig) {
     this.sessionManager = config.sessionManager;
@@ -70,9 +71,16 @@ export class AgentTools {
     // Add to session
     await this.sessionManager.addContinuation(session.id, continuation.id);
 
-    // Start execution in background (non-blocking)
-    this.continuationRunner.execute(session, continuation).catch((err) => {
+    // Start execution in background (non-blocking) and track the promise
+    const execPromise = this.continuationRunner.execute(session, continuation);
+    this.executionPromises.set(continuation.id, execPromise);
+
+    // Clean up after completion/failure
+    execPromise.finally(() => {
+      this.executionPromises.delete(continuation.id);
+    }).catch((err) => {
       console.error(`Continuation ${continuation.id} failed:`, err);
+      // Error is already stored in continuation.error by ContinuationRunner
     });
 
     return {

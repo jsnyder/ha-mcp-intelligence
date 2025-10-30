@@ -14,6 +14,9 @@ import { ToolRegistry } from './agent/tool-registry.js';
 import { ArtifactStore } from './agent/artifact-store.js';
 import { FileLayout } from './agent/file-layout.js';
 import { AgentTools } from './tools/agent-tools.js';
+import { DiagnoseEntityTool } from './tools/diagnose-entity.js';
+import { AnalyzeErrorsTool } from './tools/analyze-errors.js';
+import { createDiagnoseEntityAdapter, createAnalyzeErrorsAdapter } from './agent/tool-adapters.js';
 import { Logger } from './utils/logger.js';
 
 const logger = new Logger('Main');
@@ -54,6 +57,15 @@ async function main() {
   await artifactStore.init();
 
   const toolRegistry = new ToolRegistry();
+
+  // Register existing intelligence tools with the agent
+  const diagnoseEntityTool = new DiagnoseEntityTool(indexer);
+  const analyzeErrorsTool = new AnalyzeErrorsTool(indexer);
+
+  toolRegistry.register(createDiagnoseEntityAdapter(diagnoseEntityTool));
+  toolRegistry.register(createAnalyzeErrorsAdapter(analyzeErrorsTool));
+
+  logger.info(`Registered ${toolRegistry.listToolNames().length} tools for agent use`);
 
   const sessionManager = new SessionManager({
     dataPath: config.dataPath,

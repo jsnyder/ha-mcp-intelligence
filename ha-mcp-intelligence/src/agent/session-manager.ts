@@ -54,18 +54,32 @@ export class SessionManager {
    */
   private async loadExistingSessions(): Promise<void> {
     const sessionIds = await this.fileLayout.listSessions();
+    let loadedCount = 0;
+    let errorCount = 0;
 
     for (const sessionId of sessionIds) {
-      const session = await this.fileLayout.readSession(sessionId);
-      if (session) {
-        // Mark any running/streaming/pending continuations as interrupted
-        if (session.openContinuations.size > 0) {
-          session.status = 'active'; // Keep session active
-          // Note: Continuation status updates would happen in ContinuationRunner
-        }
+      try {
+        const session = await this.fileLayout.readSession(sessionId);
+        if (session) {
+          // Mark any running/streaming/pending continuations as interrupted
+          if (session.openContinuations.size > 0) {
+            session.status = 'active'; // Keep session active
+            // Note: Continuation status updates would happen in ContinuationRunner
+          }
 
-        this.sessions.set(sessionId, session);
+          this.sessions.set(sessionId, session);
+          loadedCount++;
+        }
+      } catch (error) {
+        // Log error but continue loading other sessions
+        console.error(`Failed to load session ${sessionId}:`, error);
+        errorCount++;
+        // TODO: Consider moving corrupted sessions to a quarantine directory
       }
+    }
+
+    if (errorCount > 0) {
+      console.warn(`Loaded ${loadedCount} sessions with ${errorCount} errors`);
     }
   }
 
