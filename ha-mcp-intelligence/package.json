@@ -1,7 +1,7 @@
 {
   "name": "ha-mcp-intelligence",
-  "version": "0.1.0",
-  "description": "Home Assistant MCP Intelligence Server",
+  "version": "0.2.0",
+  "description": "Home Assistant MCP Intelligence Server with Agent Support",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

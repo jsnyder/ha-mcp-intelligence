@@ -7,12 +7,14 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { BackgroundIndexer } from '../intelligence/background-indexer.js';
 import { DiagnoseEntityTool } from '../tools/diagnose-entity.js';
 import { AnalyzeErrorsTool } from '../tools/analyze-errors.js';
+import { AgentTools } from '../tools/agent-tools.js';
 import { Logger } from '../utils/logger.js';
 
 export interface MCPServerConfig {
   port: number;
   authRequired: boolean;
   indexer: BackgroundIndexer;
+  agentTools?: AgentTools;
 }
 
 interface AuthenticatedRequest extends Request {
@@ -29,6 +31,7 @@ export class MCPServer {
   // Tool instances
   private diagnoseEntityTool: DiagnoseEntityTool;
   private analyzeErrorsTool: AnalyzeErrorsTool;
+  private agentTools?: AgentTools;
 
   constructor(config: MCPServerConfig) {
     this.config = config;
@@ -50,6 +53,7 @@ export class MCPServer {
     // Initialize tools
     this.diagnoseEntityTool = new DiagnoseEntityTool(config.indexer);
     this.analyzeErrorsTool = new AnalyzeErrorsTool(config.indexer);
+    this.agentTools = config.agentTools;
 
     this.setupMiddleware();
     this.setupMCPHandlers();
@@ -101,12 +105,119 @@ export class MCPServer {
   private setupMCPHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: [
-          this.diagnoseEntityTool.getToolDefinition(),
-          this.analyzeErrorsTool.getToolDefinition(),
-        ],
-      };
+      const tools = [
+        this.diagnoseEntityTool.getToolDefinition(),
+        this.analyzeErrorsTool.getToolDefinition(),
+      ];
+
+      // Add agent tools if available
+      if (this.agentTools) {
+        tools.push(
+          {
+            name: 'ha_agent.start_session',
+            description: 'Start a new long-lived agent session',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                model: { type: 'object', description: 'Model configuration' },
+                budgets: { type: 'object', description: 'Budget limits' },
+                policy: { type: 'object', description: 'Session policy' },
+                preferences: { type: 'object', description: 'User preferences' },
+              },
+            },
+          },
+          {
+            name: 'ha_agent.send_message',
+            description: 'Send a message to an agent session (creates continuation)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                session_id: { type: 'string', description: 'Session ID' },
+                message: { type: 'string', description: 'User message' },
+                allow_tools: { type: 'boolean', description: 'Allow tool usage' },
+                max_steps: { type: 'number', description: 'Maximum planning steps' },
+                time_budget_ms: { type: 'number', description: 'Time budget in milliseconds' },
+              },
+              required: ['session_id', 'message'],
+            },
+          },
+          {
+            name: 'ha_agent.await_continuation',
+            description: 'Wait for a continuation to complete',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                session_id: { type: 'string', description: 'Session ID' },
+                continuation_id: { type: 'string', description: 'Continuation ID' },
+                timeout_ms: { type: 'number', description: 'Timeout in milliseconds' },
+              },
+              required: ['session_id', 'continuation_id'],
+            },
+          },
+          {
+            name: 'ha_agent.cancel',
+            description: 'Cancel a running continuation',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                continuation_id: { type: 'string', description: 'Continuation ID' },
+                reason: { type: 'string', description: 'Cancellation reason' },
+              },
+              required: ['continuation_id'],
+            },
+          },
+          {
+            name: 'ha_agent.get_session',
+            description: 'Get session state',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                session_id: { type: 'string', description: 'Session ID' },
+              },
+              required: ['session_id'],
+            },
+          },
+          {
+            name: 'ha_agent.end_session',
+            description: 'End a session',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                session_id: { type: 'string', description: 'Session ID' },
+                reason: { type: 'string', description: 'End reason' },
+              },
+              required: ['session_id'],
+            },
+          },
+          {
+            name: 'ha_agent.list_sessions',
+            description: 'List active sessions',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                status: { type: 'string', enum: ['active', 'expired'], description: 'Filter by status' },
+                limit: { type: 'number', description: 'Maximum sessions to return' },
+              },
+            },
+          },
+          {
+            name: 'ha_agent.ask',
+            description: 'One-shot agent query (creates temporary session)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                message: { type: 'string', description: 'User message' },
+                model: { type: 'object', description: 'Model configuration' },
+                budgets: { type: 'object', description: 'Budget limits' },
+                allow_tools: { type: 'boolean', description: 'Allow tool usage' },
+              },
+              required: ['message'],
+            },
+          }
+        );
+      }
+
+      return { tools };
     });
 
     // Handle tool calls
@@ -125,6 +236,47 @@ export class MCPServer {
 
           case 'analyze_errors':
             result = await this.analyzeErrorsTool.execute(args || {});
+            break;
+
+          // Agent tools
+          case 'ha_agent.start_session':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.startSession(args as never);
+            break;
+
+          case 'ha_agent.send_message':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.sendMessage(args as never);
+            break;
+
+          case 'ha_agent.await_continuation':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.awaitContinuation(args as never);
+            break;
+
+          case 'ha_agent.cancel':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.cancel(args as never);
+            break;
+
+          case 'ha_agent.get_session':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.getSession(args as never);
+            break;
+
+          case 'ha_agent.end_session':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.endSession(args as never);
+            break;
+
+          case 'ha_agent.list_sessions':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.listSessions(args as never);
+            break;
+
+          case 'ha_agent.ask':
+            if (!this.agentTools) throw new Error('Agent tools not initialized');
+            result = await this.agentTools.ask(args as never);
             break;
 
           default:
