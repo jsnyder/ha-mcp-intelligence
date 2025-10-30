@@ -1,5 +1,5 @@
 name: Home Assistant MCP Intelligence Server
-version: "0.1.0"
+version: "0.1.1"
 slug: ha-mcp-intelligence
 description: Server-side MCP intelligence for Home Assistant development
 arch:
