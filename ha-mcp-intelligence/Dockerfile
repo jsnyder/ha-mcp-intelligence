@@ -1,13 +1,25 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
 FROM $BUILD_FROM
 
-# Install Node.js 22.x (bashio already in base image)
+# Install Node.js 22.x and bashio
 RUN apk add --no-cache \
     nodejs \
     npm \
     python3 \
     make \
-    g++
+    g++ \
+    bash \
+    jq \
+    curl
+
+# Install bashio library
+RUN curl -J -L -o /tmp/bashio.tar.gz \
+    "https://github.com/hassio-addons/bashio/archive/v0.16.2.tar.gz" \
+    && mkdir /tmp/bashio \
+    && tar zxvf /tmp/bashio.tar.gz --strip 1 -C /tmp/bashio \
+    && mv /tmp/bashio/lib /usr/lib/bashio \
+    && ln -sf /usr/lib/bashio/bashio /usr/bin/bashio \
+    && rm -rf /tmp/bashio /tmp/bashio.tar.gz
 
 # Set working directory
 WORKDIR /app
